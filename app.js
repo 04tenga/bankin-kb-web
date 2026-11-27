@@ -269,6 +269,11 @@
       });
       if (hitTopic && s.missingPages && s.missingPages.length) miss.push(s.short + ' は本文' + s.missingPages.map(function (r) { return 'p.' + r[0] + '〜' + r[1]; }).join('、') +
         ' がスキャン欠落のため未収録です（谷どい・突起物廻り・屋根上付属物 等）。原本で確認してください。');
+      (s.absentTopics || []).forEach(function (t) {
+        var nt = norm(t);
+        if (ts.some(function (q) { return q.length > 1 && nt.indexOf(q) !== -1; }))
+          miss.push(s.short + ' には「' + t + '」の記載がありません。根拠はメーカー施工要領書や自社標準で示してください。');
+      });
     });
     $('notice').hidden = !miss.length;
     $('notice').textContent = miss.join(' ');
@@ -283,7 +288,8 @@
   $('foot').innerHTML = D.sources.map(function (s) {
     return '<div><b>' + esc(s.title) + '</b><br>' + esc(s.note) +
       (s.missingPages && s.missingPages.length ? '<br>欠落頁: ' +
-        s.missingPages.map(function (r) { return 'p.' + r[0] + '〜' + r[1]; }).join('、') : '') + '</div>';
+        s.missingPages.map(function (r) { return 'p.' + r[0] + '〜' + r[1]; }).join('、') : '') +
+      (s.absentTopics && s.absentTopics.length ? '<br>記載なし（確認済）: ' + esc(s.absentTopics.join('、')) : '') + '</div>';
   }).join('') + '<div style="margin-top:8px">収録 ' + D.records.length + ' 件 ／ 原文 ' + D.pages.length + ' 頁</div>';
 
   // ---- 詳細 ----
@@ -306,7 +312,9 @@
       '<dt>条件・備考</dt><dd>' + esc(r.note || '—') + '</dd>' +
       '<dt>原文の扱い</dt><dd>' + esc(r.wording) + '</dd>' +
       '<dt>出典</dt><dd>' + esc(s ? s.title : r.src) + '<br>' + (s && s.pageLabel ? '' : '本文 ') + esc(pgList(r)) + (r.fig ? '　' + esc(r.fig) : '') + '</dd>' +
-      '<dt>照合</dt><dd>' + badge(r) + (r.verified === 'OCR' ? '　<span class="ctx">OCR抽出。原本で数値を確認してください</span>' : '') + '</dd>' +
+      '<dt>照合</dt><dd>' + badge(r) + (r.verified === 'OCR' ? '　<span class="ctx">OCR抽出。原本で数値を確認してください</span>' :
+        r.verified === '現場実務' ? '　<span class="ctx">一社の現場慣行（聞き取り）。教科書の推奨値ではありません</span>' :
+        /^Web/.test(r.verified || '') ? '　<span class="ctx">Web資料。引用時は URL を添えてください</span>' : '') + '</dd>' +
       '<dt>ID</dt><dd>' + esc(r.kbid) + (r.refs.length ? '（元: ' + esc(r.refs.map(function (k) { return k.split(':')[1]; }).join('、')) + '）' : '') + '</dd>' +
       '</dl>' +
       '<div class="btns"><button class="btn primary" id="cp-short">出典をコピー</button>' +

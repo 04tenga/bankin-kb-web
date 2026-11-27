@@ -1,5 +1,5 @@
 // オフライン用キャッシュ。ビルドごとに VERSION が置換され、古いキャッシュは破棄される
-var VERSION = 'build-6';
+var VERSION = 'build-7';
 var FILES = ['./', 'index.html', 'app.css', 'app.js', 'data.js', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(VERSION).then(function (c) { return c.addAll(FILES); }).then(function () { return self.skipWaiting(); }));
