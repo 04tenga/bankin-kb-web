@@ -110,19 +110,23 @@
     if (r.std) return r.std + u + ' 程度';
     return '';
   }
+  // 頁の呼び方: 書籍は「p.150」、解説資料（source.json の pageLabel）は「解説3」
+  function pgLab(src, p) { var s = SRC[src]; return (s && s.pageLabel ? s.pageLabel : 'p.') + p; }
+  function pgList(r) { return r.pages.map(function (p) { return pgLab(r.src, p); }).join('/'); }
+  function isOcr(src) { var s = SRC[src]; return !(s && s.textKind); }
   function cite(r) {
     var s = SRC[r.src];
-    return (s ? s.short : r.src) + ' p.' + r.pages.join('/') + (r.fig ? ' ' + r.fig : '');
+    return (s ? s.short : r.src) + ' ' + pgList(r) + (r.fig ? ' ' + r.fig : '');
   }
   function citeLong(r) {
     var s = SRC[r.src], v = valueText(r) || r.note;
     return r.item + '（' + r.cons + '・' + r.part + '）' + r.vtype + ': ' + v +
       (valueText(r) && r.note ? '［' + r.note + '］' : '') +
-      ' — 出典: ' + (s ? s.title : r.src) + ' p.' + r.pages.join('/') + (r.fig ? '、' + r.fig : '') +
+      ' — 出典: ' + (s ? s.title : r.src) + ' ' + pgList(r) + (r.fig ? '、' + r.fig : '') +
       '（原文の扱い: ' + r.wording + '）';
   }
   function badge(r) {
-    return r.verified === '原本確認済'
+    return r.verified === '原本確認済' || r.verified === '規格原文確認'
       ? '<span class="badge ok">原本確認済</span>'
       : '<span class="badge ocr">' + esc(r.verified || 'OCR') + '</span>';
   }
@@ -147,7 +151,7 @@
     var sm = r.refs.map(function (k) { var x = D.summaries[k]; return x ? [x.cls, x.part, x.item, x.value].join(' ') : ''; });
     r._hi = norm(r.item);
     r._hp = norm(r.part + ' ' + r.cons + ' ' + r.vtype);
-    r._ho = norm([r.cat, r.note, r.wording, r.fig, r.kbid, valueText(r), sm.join(' '),
+    r._ho = norm([r.cat, r.note, r.wording, r.fig, r.kbid, valueText(r), sm.join(' '), (SRC[r.src] || {}).short,
       r.pages.map(function (p) { return 'p' + p; }).join(' ')].join(' '));
   });
   D.pages.forEach(function (p) { p._n = norm(p.text); });
@@ -252,7 +256,7 @@
     }
     $('page-hits').hidden = !ph.length;
     $('page-list').innerHTML = ph.map(function (p) {
-      var label = p.book != null ? SRC[p.src].short + ' p.' + p.book : SRC[p.src].short + ' PDF p.' + p.pdf;
+      var label = p.book != null ? SRC[p.src].short + ' ' + pgLab(p.src, p.book) : SRC[p.src].short + ' PDF p.' + p.pdf;
       return '<li data-pg="' + esc(p.src + ':' + (p.book != null ? p.book : 'pdf' + p.pdf)) + '"><div class="pg">' + esc(label) + '</div>' +
         hl(snippet(p.text, ts), ts) + '</li>';
     }).join('');
@@ -263,7 +267,7 @@
       var hitTopic = (s.missingTopics || []).some(function (t) {
         var nt = norm(t); return ts.some(function (q) { return nt.indexOf(q) !== -1 || q.indexOf(nt) !== -1; });
       });
-      if (hitTopic) miss.push(s.short + ' は本文' + s.missingPages.map(function (r) { return 'p.' + r[0] + '〜' + r[1]; }).join('、') +
+      if (hitTopic && s.missingPages && s.missingPages.length) miss.push(s.short + ' は本文' + s.missingPages.map(function (r) { return 'p.' + r[0] + '〜' + r[1]; }).join('、') +
         ' がスキャン欠落のため未収録です（谷どい・突起物廻り・屋根上付属物 等）。原本で確認してください。');
     });
     $('notice').hidden = !miss.length;
@@ -277,8 +281,9 @@
   });
 
   $('foot').innerHTML = D.sources.map(function (s) {
-    return '<div><b>' + esc(s.title) + '</b><br>' + esc(s.note) + '<br>欠落頁: ' +
-      s.missingPages.map(function (r) { return 'p.' + r[0] + '〜' + r[1]; }).join('、') + '</div>';
+    return '<div><b>' + esc(s.title) + '</b><br>' + esc(s.note) +
+      (s.missingPages && s.missingPages.length ? '<br>欠落頁: ' +
+        s.missingPages.map(function (r) { return 'p.' + r[0] + '〜' + r[1]; }).join('、') : '') + '</div>';
   }).join('') + '<div style="margin-top:8px">収録 ' + D.records.length + ' 件 ／ 原文 ' + D.pages.length + ' 頁</div>';
 
   // ---- 詳細 ----
@@ -300,8 +305,8 @@
       '<dt>最大（以下）</dt><dd>' + esc(r.max ? r.max + r.unit : '—') + '</dd>' +
       '<dt>条件・備考</dt><dd>' + esc(r.note || '—') + '</dd>' +
       '<dt>原文の扱い</dt><dd>' + esc(r.wording) + '</dd>' +
-      '<dt>出典</dt><dd>' + esc(s ? s.title : r.src) + '<br>本文 p.' + esc(r.pages.join('/')) + (r.fig ? '　' + esc(r.fig) : '') + '</dd>' +
-      '<dt>照合</dt><dd>' + badge(r) + (r.verified === '原本確認済' ? '' : '　<span class="ctx">OCR抽出。原本で数値を確認してください</span>') + '</dd>' +
+      '<dt>出典</dt><dd>' + esc(s ? s.title : r.src) + '<br>' + (s && s.pageLabel ? '' : '本文 ') + esc(pgList(r)) + (r.fig ? '　' + esc(r.fig) : '') + '</dd>' +
+      '<dt>照合</dt><dd>' + badge(r) + (r.verified === 'OCR' ? '　<span class="ctx">OCR抽出。原本で数値を確認してください</span>' : '') + '</dd>' +
       '<dt>ID</dt><dd>' + esc(r.kbid) + (r.refs.length ? '（元: ' + esc(r.refs.map(function (k) { return k.split(':')[1]; }).join('、')) + '）' : '') + '</dd>' +
       '</dl>' +
       '<div class="btns"><button class="btn primary" id="cp-short">出典をコピー</button>' +
@@ -311,10 +316,10 @@
         return '<div><span class="ctx">' + esc(x.cls) + ' ／ ' + esc(x.part) + '</span><br><b>' + esc(x.item) + '</b>：' + esc(x.value) + '</div>';
       }).join('<hr style="border:0;border-top:1px solid var(--line)">') + '</div>';
     }
-    h += '<h2>原文（OCR）</h2><div class="btns" style="margin-top:0">' + r.pages.map(function (p) {
+    h += '<h2>' + (isOcr(r.src) ? '原文（OCR）' : '解説本文') + '</h2><div class="btns" style="margin-top:0">' + r.pages.map(function (p) {
       return PAGE[r.src + ':' + p]
-        ? '<button class="btn" data-pg="' + esc(r.src + ':' + p) + '">p.' + p + ' を開く</button>'
-        : '<span class="ctx">p.' + p + ' は原文データなし</span>';
+        ? '<button class="btn" data-pg="' + esc(r.src + ':' + p) + '">' + esc(pgLab(r.src, p)) + ' を開く</button>'
+        : '<span class="ctx">' + esc(pgLab(r.src, p)) + ' は原文データなし</span>';
     }).join('') + '</div>';
     if (related.length) {
       h += '<h2>同じ頁の項目</h2><ul class="cards related">' + related.map(function (x) {
@@ -341,16 +346,16 @@
     if (!p) return go('');
     var idx = D.pages.indexOf(p), prev = D.pages[idx - 1], next = D.pages[idx + 1];
     function key2(x) { return x && x.src === src ? x.src + ':' + (x.book != null ? x.book : 'pdf' + x.pdf) : ''; }
-    function lab(x) { return x.book != null ? 'p.' + x.book : 'PDF p.' + x.pdf; }
+    function lab(x) { return x.book != null ? pgLab(x.src, x.book) : 'PDF p.' + x.pdf; }
     var recs = p.book != null ? D.records.filter(function (r) { return r.src === src && r.pages.indexOf(p.book) !== -1; }) : [];
-    var h = '<div class="ctx">' + esc(SRC[src].title) + '　（PDF p.' + p.pdf + '）</div>' +
-      '<div class="ctx" style="margin:4px 0 8px">OCRのため数値・記号に誤読があり得ます。図表は文字化けしています。</div>' +
+    var h = '<div class="ctx">' + esc(SRC[src].title) + (isOcr(src) ? '　（PDF p.' + p.pdf + '）' : '') + '</div>' +
+      (isOcr(src) ? '<div class="ctx" style="margin:4px 0 8px">OCRのため数値・記号に誤読があり得ます。図表は文字化けしています。</div>' : '<div style="height:8px"></div>') +
       '<div class="pager">' +
       (key2(prev) ? '<button class="btn" data-pg="' + esc(key2(prev)) + '">← ' + esc(lab(prev)) + '</button>' : '<span></span>') +
       (key2(next) ? '<button class="btn" data-pg="' + esc(key2(next)) + '">' + esc(lab(next)) + ' →</button>' : '<span></span>') +
       '</div><pre class="ocr">' + hl(p.text, terms()) + '</pre>';
     if (recs.length) {
-      h += '<h2>この頁の収録項目</h2><ul class="cards">' + recs.map(function (x) {
+      h += '<h2>' + (isOcr(src) ? 'この頁' : 'この項') + 'の収録項目</h2><ul class="cards">' + recs.map(function (x) {
         return '<li class="card" data-id="' + esc(x.id) + '"><div class="head"><span class="item">' + esc(x.item) +
           '</span><span class="vtype">' + esc(x.vtype) + '</span></div><div class="ctx">' + esc(x.part) + '　' +
           esc(valueText(x) || x.note) + '</div></li>';
